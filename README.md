@@ -1,2 +1,2 @@
 # Perspective correction
-Deep learning based perspective correction project
+Deep learning based perspective correction project.
