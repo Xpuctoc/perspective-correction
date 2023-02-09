@@ -1,7 +1,8 @@
 import torch
+import numpy as np
 
 
-def mse_metric(output, target):
+def rmse(output, target):
     with torch.no_grad():
         metric = torch.nn.MSELoss()
-        return metric(output, target)
+        return np.sqrt(metric(output, target))
