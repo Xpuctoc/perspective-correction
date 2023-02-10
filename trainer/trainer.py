@@ -10,13 +10,13 @@ class Trainer(BaseTrainer):
     """
     Trainer class
     """
-    def __init__(self, model, criterion, metric_ftns, optimizer, config, device,
-                 data_loader, scaler, amp_autocast, valid_data_loader=None, lr_scheduler=None, len_epoch=None):
-        super().__init__(model, criterion, metric_ftns, optimizer, config)
+    def __init__(self, models, criterion, metric_ftns, optimizers, config, device,
+                 data_loader, scalers, amp_autocast, valid_data_loader=None, lr_schedulers=None, len_epoch=None):
+        super().__init__(models, criterion, metric_ftns, optimizers, config)
         self.config = config
         self.device = device
         self.data_loader = data_loader
-        self.scaler = scaler
+        self.scalers = scalers
         self.amp_autocast = amp_autocast
         if len_epoch is None:
             # epoch-based training
@@ -27,12 +27,14 @@ class Trainer(BaseTrainer):
             self.len_epoch = len_epoch
         self.valid_data_loader = valid_data_loader
         self.do_validation = self.valid_data_loader is not None
-        self.lr_scheduler = lr_scheduler
+        self.lr_scheduler = lr_schedulers
         # self.log_step = int(np.sqrt(data_loader.batch_size))
-        self.log_step = 100
+        self.log_step = 50
 
         self.train_metrics = MetricTracker('loss', *[m.__name__ for m in self.metric_ftns], writer=self.writer)
         self.valid_metrics = MetricTracker('loss', *[m.__name__ for m in self.metric_ftns], writer=self.writer)
+
+        self.weight_penalties = [100.0, 1.0, 1000000.0]
 
     def _train_epoch(self, epoch):
         """
@@ -40,12 +42,18 @@ class Trainer(BaseTrainer):
         :param epoch: Integer, current training epoch.
         :return: A log that contains average loss and metric in this epoch.
         """
-        self.model.train()
+        for i in range(3):
+            self.models[i].train()
         self.train_metrics.reset()
 
         start_time = datetime.now()
         for batch_idx, (data, target) in enumerate(self.data_loader):
-            data, target = data.to(self.device), target.to(self.device)
+            data = data.to(self.device)
+
+            t = [0, 0, 0]
+            t[0] = target[:, [0, 3]].to(self.device)
+            t[1] = target[:, [1, 2]].to(self.device)
+            t[2] = target[:, [4, 5]].to(self.device)
 
             # self.optimizer.zero_grad()
             # output = self.model(data)
@@ -53,26 +61,40 @@ class Trainer(BaseTrainer):
             # loss.backward()
             # self.optimizer.step()
 
-            with self.amp_autocast():
-                output = self.model(data)
-                loss = self.criterion(output, target)
+            overall_predictions = []
+            batch_loss = 0.0
+            for i in range(3):
+                with self.amp_autocast():
+                    output = self.models[i](data)
+                    loss = self.criterion(output, t[i], self.weight_penalties[i], self.device)
 
-            self.scaler.scale(loss).backward()
-            self.scaler.step(self.optimizer)
-            self.scaler.update()
-            self.optimizer.zero_grad()
+                self.scalers[i].scale(loss).backward()
+                self.scalers[i].step(self.optimizers[i])
+                self.scalers[i].update()
+                self.optimizers[i].zero_grad()
+
+                batch_loss += loss.item()
+                overall_predictions.append(output[:, 0].detach().cpu().reshape(-1, 1))
+                overall_predictions.append(output[:, 1].detach().cpu().reshape(-1, 1))
+
+            overall_prediction = torch.cat([overall_predictions[0],
+                                            overall_predictions[2],
+                                            overall_predictions[3],
+                                            overall_predictions[1],
+                                            overall_predictions[4],
+                                            overall_predictions[5]], dim=1)
 
             self.writer.set_step((epoch - 1) * self.len_epoch + batch_idx)
-            self.train_metrics.update('loss', loss.item())
+            self.train_metrics.update('loss', batch_loss)
             for met in self.metric_ftns:
-                self.train_metrics.update(met.__name__, met(output, target))
+                self.train_metrics.update(met.__name__, met(overall_prediction, target))
 
             if batch_idx % self.log_step == 0:
                 self.logger.debug('Train Epoch: {} {} Loss: {:.6f}'.format(
                     epoch,
                     self._progress(batch_idx),
-                    loss.item()))
-                self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
+                    batch_loss))
+                # self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
 
             if batch_idx == self.len_epoch:
                 break
@@ -91,8 +113,8 @@ class Trainer(BaseTrainer):
                           'Validation took': timedelta(seconds=val_elapsed_time_secs)}
         log.update(additional_log)
 
-        if self.lr_scheduler:
-            self.lr_scheduler.step()
+        # if self.lr_scheduler:
+        #     self.lr_scheduler.step()
         return log
 
     def _valid_epoch(self, epoch):
@@ -101,24 +123,45 @@ class Trainer(BaseTrainer):
         :param epoch: Integer, current training epoch.
         :return: A log that contains information about validation
         """
-        self.model.eval()
+        for i in range(3):
+            self.models[i].eval()
         self.valid_metrics.reset()
+
         with torch.no_grad():
             for batch_idx, (data, target) in enumerate(self.valid_data_loader):
-                data, target = data.to(self.device), target.to(self.device)
+                data = data.to(self.device)
 
-                output = self.model(data)
-                loss = self.criterion(output, target)
+                t = [0, 0, 0]
+                t[0] = target[:, [0, 3]].to(self.device)
+                t[1] = target[:, [1, 2]].to(self.device)
+                t[2] = target[:, [4, 5]].to(self.device)
+
+                overall_prediction = []
+                batch_loss = 0.0
+                for i in range(3):
+                    output = self.models[i](data)
+                    loss = self.criterion(output, t[i], self.weight_penalties[i], self.device)
+
+                    batch_loss += loss.item()
+                    overall_prediction.append(output[:, 0].detach().cpu().reshape(-1, 1))
+                    overall_prediction.append(output[:, 1].detach().cpu().reshape(-1, 1))
+
+                overall_prediction = torch.cat([overall_prediction[0],
+                                                overall_prediction[2],
+                                                overall_prediction[3],
+                                                overall_prediction[1],
+                                                overall_prediction[4],
+                                                overall_prediction[5]], dim=1)
 
                 self.writer.set_step((epoch - 1) * len(self.valid_data_loader) + batch_idx, 'valid')
-                self.valid_metrics.update('loss', loss.item())
+                self.valid_metrics.update('loss', batch_loss)
                 for met in self.metric_ftns:
-                    self.valid_metrics.update(met.__name__, met(output, target))
-                self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
+                    self.valid_metrics.update(met.__name__, met(overall_prediction, target))
+                # self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
 
-        # add histogram of model parameters to the tensorboard
-        for name, p in self.model.named_parameters():
-            self.writer.add_histogram(name, p, bins='auto')
+        # # add histogram of model parameters to the tensorboard
+        # for name, p in self.model.named_parameters():
+        #     self.writer.add_histogram(name, p, bins='auto')
         return self.valid_metrics.result()
 
     def _progress(self, batch_idx):

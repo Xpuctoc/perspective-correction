@@ -1,5 +1,5 @@
 {
-    "name": "DenseNet+Conv9+FC(single)full",
+    "name": "ParallelHomographyRegressor1",
     "n_gpu": 1,
 
     "arch": {
@@ -24,7 +24,7 @@
             "amsgrad": true
         }
     },
-    "loss": "mse_loss",
+    "loss": "weighted_mse_loss",
     "metrics": [
         "rmse"
     ],
@@ -36,7 +36,7 @@
         }
     },
     "trainer": {
-        "epochs": 20,
+        "epochs": 10,
 
         "save_dir": "saved/",
         "save_period": 5,
@@ -45,6 +45,6 @@
         "monitor": "min val_loss",
         "early_stop": 10,
 
-        "tensorboard": true
+        "tensorboard": false
     }
 }

@@ -26,36 +26,44 @@ def main(config):
     data_loader = config.init_obj('data_loader', module_data)
     valid_data_loader = data_loader.split_validation()
 
-    # build model architecture, then print to console
-    model = config.init_obj('arch', module_arch)
-    logger.info(model)
-
     # prepare for (multi-device) GPU training
     device, device_ids = prepare_device(config['n_gpu'])
-    model = model.to(device)
-    if len(device_ids) > 1:
-        model = torch.nn.DataParallel(model, device_ids=device_ids)
+
+    models = [0, 0, 0]
+    optimizers = [0, 0, 0]
+    scalers = [0, 0, 0]
+    lr_schedulers = [0, 0, 0]
+
+    for i in range(len(models)):
+        # build model architecture, then print to console
+        models[i] = config.init_obj('arch', module_arch)
+        logger.info(models[i])
+
+        models[i] = models[i].to(device)
+        if len(device_ids) > 1:
+            models[i] = torch.nn.DataParallel(models[i], device_ids=device_ids)
+
+        scalers[i] = torch.cuda.amp.GradScaler()
+
+        # build optimizer, learning rate scheduler. delete every lines containing lr_scheduler for disabling scheduler
+        trainable_params = filter(lambda p: p.requires_grad, models[i].parameters())
+        optimizers[i] = config.init_obj('optimizer', torch.optim, trainable_params)
+        lr_schedulers[i] = config.init_obj('lr_scheduler', torch.optim.lr_scheduler, optimizers[i])
 
     # get function handles of loss and metrics
     criterion = getattr(module_loss, config['loss'])
     metrics = [getattr(module_metric, met) for met in config['metrics']]
 
-    scaler = torch.cuda.amp.GradScaler()
     amp_autocast = torch.cuda.amp.autocast
 
-    # build optimizer, learning rate scheduler. delete every lines containing lr_scheduler for disabling scheduler
-    trainable_params = filter(lambda p: p.requires_grad, model.parameters())
-    optimizer = config.init_obj('optimizer', torch.optim, trainable_params)
-    lr_scheduler = config.init_obj('lr_scheduler', torch.optim.lr_scheduler, optimizer)
-
-    trainer = Trainer(model, criterion, metrics, optimizer,
+    trainer = Trainer(models, criterion, metrics, optimizers,
                       config=config,
                       device=device,
                       data_loader=data_loader,
-                      scaler=scaler,
+                      scalers=scalers,
                       amp_autocast=amp_autocast,
                       valid_data_loader=valid_data_loader,
-                      lr_scheduler=lr_scheduler)
+                      lr_schedulers=lr_schedulers)
 
     trainer.train()
 
