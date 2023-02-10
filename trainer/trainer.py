@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from torchvision.utils import make_grid
+from datetime import datetime, timedelta
 from base import BaseTrainer
 from utils import inf_loop, MetricTracker
 
@@ -41,6 +42,8 @@ class Trainer(BaseTrainer):
         """
         self.model.train()
         self.train_metrics.reset()
+
+        start_time = datetime.now()
         for batch_idx, (data, target) in enumerate(self.data_loader):
             data, target = data.to(self.device), target.to(self.device)
 
@@ -75,9 +78,18 @@ class Trainer(BaseTrainer):
                 break
         log = self.train_metrics.result()
 
+        elapsed_time_secs = (datetime.now() - start_time).seconds
+
+        val_start_time = datetime.now()
         if self.do_validation:
             val_log = self._valid_epoch(epoch)
             log.update(**{'val_'+k: v for k, v in val_log.items()})
+
+        val_elapsed_time_secs = (datetime.now() - val_start_time).seconds
+
+        additional_log = {'Epoch took': timedelta(seconds=elapsed_time_secs),
+                          'Validation took': timedelta(seconds=val_elapsed_time_secs)}
+        log.update(additional_log)
 
         if self.lr_scheduler:
             self.lr_scheduler.step()
