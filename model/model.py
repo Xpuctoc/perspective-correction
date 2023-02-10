@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torchvision import models
 from base import BaseModel
 
 
@@ -25,6 +26,12 @@ class ConvBlock(nn.Module):
 class HomographyRegressor(BaseModel):
     def __init__(self):
         super().__init__()
+        pretrained_model = models.densenet161(pretrained=True)
+        for param in pretrained_model.parameters():
+            param.requires_grad = False
+
+        self.pretrained_bridge = nn.Sequential(*list(pretrained_model.children())[:-2])
+
         self.conv1 = ConvBlock(3, 64, 3, 2, 1, 3, 1, 0)
         self.conv2 = ConvBlock(64, 64, 3, 2, 1, 3, 1, 0)
         self.conv3 = ConvBlock(64, 64, 3, 2, 1, 3, 1, 0)
@@ -48,6 +55,7 @@ class HomographyRegressor(BaseModel):
         )
 
     def forward(self, x):
+        x = self.pretrained_bridge(x)
         x = self.conv1(x)
         x = self.conv2(x)
         x = self.conv3(x)
