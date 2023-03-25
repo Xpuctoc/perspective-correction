@@ -37,21 +37,21 @@ class HomographyRegressor(BaseModel):
         self.conv3 = ConvBlock(64, 64, 3, 2, 1, 3, 1, 0)
         self.conv4 = ConvBlock(64, 64, 3, 2, 1, 3, 1, 0)
         self.conv5 = ConvBlock(64, 64, 3, 2, 1, 3, 1, 0)
-        self.conv6 = ConvBlock(64, 64, (5, 3), 2, 1, 2, 1, 0)
-        self.conv7 = ConvBlock(64, 64, (5, 3), 2, 1, 2, 1, 0)
-        self.conv8 = ConvBlock(64, 64, (4, 3), 2, 1, 2, 1, 0)
+        self.conv6 = ConvBlock(64, 64, 3, 2, 1, 2, 1, 0)
+        self.conv7 = ConvBlock(64, 64, 3, 1, 1, 2, 1, 0)
+        self.conv8 = ConvBlock(64, 64, 3, 1, 1, 2, 1, 0)
         self.conv9 = ConvBlock(64, 64, 3, 1, 1, 2, 1, 0)
 
         self.fc = nn.Sequential(
+            nn.Linear(576, 256),
+            nn.ReLU(),
             nn.Linear(256, 128),
             nn.ReLU(),
             nn.Linear(128, 64),
             nn.ReLU(),
             nn.Linear(64, 32),
             nn.ReLU(),
-            nn.Linear(32, 16),
-            nn.ReLU(),
-            nn.Linear(16, 6)
+            nn.Linear(32, 6)
         )
 
     def forward(self, x):

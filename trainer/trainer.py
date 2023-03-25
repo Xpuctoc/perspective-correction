@@ -92,7 +92,7 @@ class Trainer(BaseTrainer):
         log.update(additional_log)
 
         if self.lr_scheduler:
-            self.lr_scheduler.step()
+            self.lr_scheduler.step(val_log['loss'])
         return log
 
     def _valid_epoch(self, epoch):

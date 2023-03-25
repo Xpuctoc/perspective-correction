@@ -9,19 +9,16 @@ class HomographyDataset(torch.utils.data.Dataset):
         self.data_path = data_path
         self.is_test = is_test
         self.transforms = transforms
-
-        # self.images = os.listdir(os.path.join(self.data_path, 'images'))
+        self.images = os.listdir(os.path.join(self.data_path, 'images'))
         # self.images.remove('.DS_Store')
 
-        # remove images that are not 1600x1200
-
-        self.images = []
-        for image_name in os.listdir(os.path.join(self.data_path, 'images')):
-            if image_name != '.DS_Store':
-                image_path = os.path.join(self.data_path, 'images', image_name)
-                image = cv2.imread(image_path)
-                if image.shape[:2] == (1600, 1200):
-                    self.images.append(image_name)
+        # self.images = []
+        # for image_name in os.listdir(os.path.join(self.data_path, 'images')):
+        #     if image_name != '.DS_Store':
+        #         image_path = os.path.join(self.data_path, 'images', image_name)
+        #         image = cv2.imread(image_path)
+        #         if image.shape[:2] == (1600, 1200):
+        #             self.images.append(image_name)
 
     def __getitem__(self, idx):
         image_name = self.images[idx]
@@ -48,7 +45,7 @@ class HomographyDataset(torch.utils.data.Dataset):
         return len(self.images)
 
     def preprocess(self, image):
-        image = cv2.resize(image, (1600, 1200))
+        # image = cv2.resize(image, (512, 512))
         image = image.transpose(2, 0, 1)
         image = (image - 127.5) / 128
 
