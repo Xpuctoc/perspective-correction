@@ -7,9 +7,8 @@ from base import BaseModel
 class ConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels,
                  conv_kernel_size, conv_stride, conv_padding,
-                 pool_kernel_size, pool_stride, pool_padding, use_bn=False):
+                 pool_kernel_size, pool_stride, pool_padding):
         super().__init__()
-        self.use_bn = use_bn
         self.conv = nn.Conv2d(in_channels, out_channels,
                               kernel_size=conv_kernel_size, stride=conv_stride, padding=conv_padding)
         self.bn = nn.BatchNorm2d(out_channels)
@@ -18,8 +17,7 @@ class ConvBlock(nn.Module):
 
     def forward(self, x):
         x = self.conv(x)
-        if self.use_bn:
-            x = self.bn(x)
+        x = self.bn(x)
         x = self.pool(x)
         x = self.relu(x)
         return x
@@ -39,21 +37,21 @@ class HomographyRegressor(BaseModel):
         self.conv3 = ConvBlock(64, 64, 3, 2, 1, 3, 1, 0)
         self.conv4 = ConvBlock(64, 64, 3, 2, 1, 3, 1, 0)
         self.conv5 = ConvBlock(64, 64, 3, 2, 1, 3, 1, 0)
-        self.conv6 = ConvBlock(64, 64, (5, 3), 2, 1, 2, 1, 0)
-        self.conv7 = ConvBlock(64, 64, (5, 3), 2, 1, 2, 1, 0)
-        self.conv8 = ConvBlock(64, 64, (4, 3), 2, 1, 2, 1, 0)
+        self.conv6 = ConvBlock(64, 64, 3, 2, 1, 2, 1, 0)
+        self.conv7 = ConvBlock(64, 64, 3, 1, 1, 2, 1, 0)
+        self.conv8 = ConvBlock(64, 64, 3, 1, 1, 2, 1, 0)
         self.conv9 = ConvBlock(64, 64, 3, 1, 1, 2, 1, 0)
 
         self.fc = nn.Sequential(
+            nn.Linear(576, 256),
+            nn.ReLU(),
             nn.Linear(256, 128),
             nn.ReLU(),
             nn.Linear(128, 64),
             nn.ReLU(),
             nn.Linear(64, 32),
             nn.ReLU(),
-            nn.Linear(32, 16),
-            nn.ReLU(),
-            nn.Linear(16, 2)
+            nn.Linear(32, 2)
         )
 
     def forward(self, x):
