@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import cv2
 import os
+import albumentations as A
 
 
 class HomographyDataset(torch.utils.data.Dataset):
@@ -10,21 +11,13 @@ class HomographyDataset(torch.utils.data.Dataset):
         self.is_test = is_test
         self.transforms = transforms
         self.images = os.listdir(os.path.join(self.data_path, 'images'))
-        # self.images.remove('.DS_Store')
-
-        # self.images = []
-        # for image_name in os.listdir(os.path.join(self.data_path, 'images')):
-        #     if image_name != '.DS_Store':
-        #         image_path = os.path.join(self.data_path, 'images', image_name)
-        #         image = cv2.imread(image_path)
-        #         if image.shape[:2] == (1600, 1200):
-        #             self.images.append(image_name)
 
     def __getitem__(self, idx):
         image_name = self.images[idx]
         image_name_clear = image_name[:image_name.rfind('.')]  # without .jpg
         image_path = os.path.join(self.data_path, 'images', image_name)
         image = cv2.imread(image_path)  # BGR
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         if self.transforms is not None:
             image = self.transforms(image=image)['image']
@@ -37,16 +30,37 @@ class HomographyDataset(torch.utils.data.Dataset):
         homography_path = os.path.join(self.data_path, 'homographys',
                                        image_name_clear + '.npy')
         homography = np.load(homography_path)
-        homography = homography[:, :2].flatten()
+        # homography = homography[:, :2].flatten()  # 6dim output
+        # homography = homography.flatten()[:-1]  # 8dim output
+        homography = homography.flatten()  # 9dim output
 
+        mean = np.array([9.10049482e-01, -5.85413979e-02, 6.12820893e+01,
+                         -3.09079822e-03, 8.47585815e-01, 1.43520874e+01,
+                         5.25377075e-06, -2.73889932e-04, 9.95821547e-01])
+
+        std = np.array([2.80111082e-01, 2.16029604e-01, 7.01551215e+01,
+                        1.44707826e-01, 3.37215873e-01, 3.60872377e+01,
+                        4.02565552e-04, 6.16009993e-04, 2.02862867e-02])
+
+        homography = (homography - mean) / std
+
+        # mean_abs = np.array([9.10049482e-01, 1.33448711e-01, 6.12820893e+01,
+        #                      6.29014048e-02, 8.47585815e-01, 1.43520874e+01,
+        #                      2.12661938e-04, 5.06282876e-04, 9.95821547e-01])
+        #
+        # homography = homography / mean_abs
+
+        # return image
+        # return homography
         return torch.from_numpy(image).float(), torch.from_numpy(homography).float()
 
     def __len__(self):
         return len(self.images)
 
     def preprocess(self, image):
-        # image = cv2.resize(image, (512, 512))
+        normalize = A.Normalize(mean=(0.471, 0.438, 0.405), std=(0.259, 0.251, 0.251))
+        image = normalize(image=image)['image']
         image = image.transpose(2, 0, 1)
-        image = (image - 127.5) / 128
+        # image = (image - 127.5) / 128
 
         return image

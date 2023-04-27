@@ -51,7 +51,7 @@ class HomographyRegressor(BaseModel):
             nn.ReLU(),
             nn.Linear(64, 32),
             nn.ReLU(),
-            nn.Linear(32, 6)
+            nn.Linear(32, 9)
         )
 
     def forward(self, x):
