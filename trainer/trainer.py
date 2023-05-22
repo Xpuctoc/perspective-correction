@@ -44,7 +44,7 @@ class Trainer(BaseTrainer):
         self.train_metrics.reset()
 
         start_time = datetime.now()
-        for batch_idx, (data, target) in enumerate(self.data_loader):
+        for batch_idx, (data, _, target) in enumerate(self.data_loader):
             data, target = data.to(self.device), target.to(self.device)
 
             # self.optimizer.zero_grad()

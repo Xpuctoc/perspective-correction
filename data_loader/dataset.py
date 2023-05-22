@@ -16,8 +16,9 @@ class HomographyDataset(torch.utils.data.Dataset):
         image_name = self.images[idx]
         image_name_clear = image_name[:image_name.rfind('.')]  # without .jpg
         image_path = os.path.join(self.data_path, 'images', image_name)
-        image = cv2.imread(image_path)  # BGR
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        img = cv2.imread(image_path)  # BGR
+        image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        src_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         if self.transforms is not None:
             image = self.transforms(image=image)['image']
@@ -30,9 +31,7 @@ class HomographyDataset(torch.utils.data.Dataset):
         homography_path = os.path.join(self.data_path, 'homographys',
                                        image_name_clear + '.npy')
         homography = np.load(homography_path)
-        # homography = homography[:, :2].flatten()  # 6dim output
-        # homography = homography.flatten()[:-1]  # 8dim output
-        homography = homography.flatten()  # 9dim output
+        homography = homography.flatten()
 
         mean = np.array([9.10049482e-01, -5.85413979e-02, 6.12820893e+01,
                          -3.09079822e-03, 8.47585815e-01, 1.43520874e+01,
@@ -50,16 +49,16 @@ class HomographyDataset(torch.utils.data.Dataset):
         #
         # homography = homography / mean_abs
 
-        # return image
-        # return homography
-        return torch.from_numpy(image).float(), torch.from_numpy(homography).float()
+        return torch.from_numpy(image).float(), src_img, torch.from_numpy(homography).float()
 
     def __len__(self):
         return len(self.images)
 
     def preprocess(self, image):
         normalize = A.Normalize(mean=(0.471, 0.438, 0.405), std=(0.259, 0.251, 0.251))
+        # crop = A.CenterCrop(504, 504)  # for dinov2-vit/14
         image = normalize(image=image)['image']
+        # image = crop(image=image)['image']
         image = image.transpose(2, 0, 1)
         # image = (image - 127.5) / 128
 
