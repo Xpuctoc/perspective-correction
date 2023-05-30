@@ -1,19 +1,19 @@
 {
-    "name": "9dim-output-normalized-img-and-target",
+    "name": "tinyvit-2layers",
     "n_gpu": 1,
 
     "arch": {
-        "type": "HomographyRegressor",
+        "type": "TinyViT",
         "args": {}
     },
     "data_loader": {
         "type": "HomographyDataLoader",
         "args":{
             "data_dir": "data/mini_dataset_correction/",
-            "batch_size": 50,
+            "batch_size": 16,
             "shuffle": true,
             "validation_split": 0.1,
-            "num_workers": 2
+            "num_workers": 4
         }
     },
     "optimizer": {
