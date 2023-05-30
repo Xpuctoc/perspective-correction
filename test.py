@@ -21,20 +21,12 @@ np.random.seed(SEED)
 def main(config):
     logger = config.get_logger('test')
 
-    # # setup data_loader instances
-    # data_loader = getattr(module_data, config['data_loader']['type'])(
-    #     config['data_loader']['args']['data_dir'],
-    #     batch_size=50,
-    #     shuffle=False,
-    #     validation_split=0.0,
-    #     training=False,
-    #     num_workers=2
-    # )
     data_loader = config.init_obj('data_loader', module_data)
     data_loader = data_loader.split_validation()
 
     # build model architecture
     model = config.init_obj('arch', module_arch)
+    model = torch.compile(model)
     logger.info(model)
 
     # get function handles of loss and metrics
@@ -55,14 +47,6 @@ def main(config):
 
     total_loss = 0.0
     total_metrics = torch.zeros(len(metric_fns)).to(device)
-
-    # mean = torch.Tensor([9.10049482e-01, -5.85413979e-02, 6.12820893e+01,
-    #                      -3.09079822e-03, 8.47585815e-01, 1.43520874e+01,
-    #                      5.25377075e-06, -2.73889932e-04, 9.95821547e-01]).to(device)
-    #
-    # std = torch.Tensor([2.80111082e-01, 2.16029604e-01, 7.01551215e+01,
-    #                     1.44707826e-01, 3.37215873e-01, 3.60872377e+01,
-    #                     4.02565552e-04, 6.16009993e-04, 2.02862867e-02]).to(device)
 
     ssim_metric = 0.0
 
